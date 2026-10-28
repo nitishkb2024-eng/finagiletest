@@ -1,0 +1,54 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  ci-cd-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+    # --- (1) STAGE: SOURCE CODE & VERSION CONTROL ---
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # --- (2) STAGE: CONTINUOUS INTEGRATION ---
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Automated Tests
+      run: |
+        pytest test_calculator.py
+
+    # --- (3) STAGE: BUILD & PUSH TO DOCKER HUB ---
+    - name: Log in to Docker Hub
+      if: success()
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and Push Docker Image
+      if: success()
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        # Generates a unique tag based on the commit hash
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:${{ github.sha }}
+          ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:latest
+
+    # --- (4) STAGE: DEPLOYMENT PREPARATION ---
+    # Updates the deployment manifest dynamically with the new unique image tag
+    - name: Update Kubernetes Manifest
+      run: |
+        sed -i "s|image: .*|image: ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:${{ github.sha }}|g" k8s/deployment.yaml
