@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: calculator-container
-        image: nitish3021/calculator-app:latest # Will be replaced dynamically by CI pipeline
+        image: nitish3021/calculator-app:latest 
         ports:
         - containerPort: 8080
